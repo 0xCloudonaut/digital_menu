@@ -1,0 +1,73 @@
+version: '3.8'
+
+services:
+  mongodb:
+    image: mongo:7
+    container_name: menu_mongodb
+    restart: unless-stopped
+    environment:
+      MONGO_INITDB_DATABASE: ${MONGO_DB_NAME:-restaurant_db}
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_ROOT_USERNAME}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_ROOT_PASSWORD}
+      MONGO_APP_USERNAME: ${MONGO_APP_USERNAME}
+      MONGO_APP_PASSWORD: ${MONGO_APP_PASSWORD}
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_data:/data/db
+      - ./mongo-init.js:/docker-entrypoint-initdb.d/mongo-init.js:ro
+    networks:
+      - menu_net
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping').ok"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build:
+      context: ../backend
+    container_name: menu_backend
+    restart: unless-stopped
+    depends_on:
+      mongodb:
+        condition: service_healthy
+    ports:
+      - "8080:8080"
+    environment:
+      SPRING_MONGODB_URI: mongodb://${MONGO_APP_USERNAME}:${MONGO_APP_PASSWORD}@mongodb:27017/${MONGO_DB_NAME:-restaurant_db}?authSource=admin
+      APP_JWT_SECRET: ${APP_JWT_SECRET}
+      APP_QR_SECRET: ${APP_QR_SECRET}
+      APP_AUTH_SETUP_KEY: ${APP_AUTH_SETUP_KEY}
+      APP_AUTH_ALLOW_PUBLIC_REGISTRATION: ${APP_AUTH_ALLOW_PUBLIC_REGISTRATION:-false}
+      APP_PUBLIC_MENU_BASE_URL: ${APP_PUBLIC_MENU_BASE_URL:-http://localhost:3000}
+      APP_ORDERS_SLA_MINUTES: ${APP_ORDERS_SLA_MINUTES:-20}
+    networks:
+      - menu_net
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "-", "http://localhost:8080/actuator/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 6
+
+  frontend:
+    build:
+      context: ../react
+      args:
+        VITE_API_BASE_URL: ${VITE_API_BASE_URL:-http://localhost:8080}
+        VITE_TENANT_ID: ${VITE_TENANT_ID:-demo-restaurant}
+    container_name: menu_frontend
+    restart: unless-stopped
+    depends_on:
+      backend:
+        condition: service_healthy
+    ports:
+      - "3000:80"
+    networks:
+      - menu_net
+
+volumes:
+  mongo_data:
+
+networks:
+  menu_net:

@@ -1,0 +1,12 @@
+# Java
+backend/target/
+*.class
+*.jar
+
+# React
+react/node_modules/
+react/dist/
+react/build/
+
+# OS
+.DS_Store
