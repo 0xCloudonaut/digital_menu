@@ -22,9 +22,7 @@ jobs:
           cache: maven
 
       - name: Run JUnit tests from separate test folder
-        run: |
-          cd backend
-          ./mvnw -f pom.xml -B clean test
+        run: ./backend/mvnw -B clean test -f ./backend/pom.xml
 
   build:
     runs-on: ubuntu-latest
@@ -42,9 +40,7 @@ jobs:
           cache: maven
 
       - name: Build backend artifact
-        run: | 
-          cd backend
-          ./mvnw -f pom.xml -B package -DskipTests
+        run: ./backend/mvnw -B package -DskipTests -f ./backend/pom.xml
 
   docker-build:
     runs-on: ubuntu-latest
