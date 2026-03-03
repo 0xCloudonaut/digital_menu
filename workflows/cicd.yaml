@@ -1,1 +1,41 @@
-# test file will be used for actions setup later
+name: Backend CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    needs: build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+
+      - name: Run JUnit tests from separate test folder
+        run: ./backend/mvnw -f pom.xml -B clean test
+
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+
+      - name: Build backend artifact
+        run: ./backend/mvnw -f pom.xml -B package -DskipTests
