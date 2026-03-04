@@ -104,7 +104,20 @@ jobs:
           aws ecs describe-task-definition \
             --task-definition digital-menu-backend \
             --query taskDefinition \
-            > backend-task.json
+            > backend-task-full.json
+      
+          cat backend-task-full.json \
+          | jq 'del(
+              .taskDefinitionArn,
+              .revision,
+              .status,
+              .requiresAttributes,
+              .compatibilities,
+              .registeredAt,
+              .registeredBy,
+              .enableFaultInjection
+            )' \
+          > backend-task.json
 
       - name: Render Backend Task Definition
         id: backend-task
@@ -132,7 +145,20 @@ jobs:
           aws ecs describe-task-definition \
             --task-definition digital-menu-frontend \
             --query taskDefinition \
-            > frontend-task.json
+            > frontend-task-full.json
+      
+          cat frontend-task-full.json \
+          | jq 'del(
+              .taskDefinitionArn,
+              .revision,
+              .status,
+              .requiresAttributes,
+              .compatibilities,
+              .registeredAt,
+              .registeredBy,
+              .enableFaultInjection
+            )' \
+          > frontend-task.json
 
       - name: Render Frontend Task Definition
         id: frontend-task
