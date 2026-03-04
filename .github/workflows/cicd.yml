@@ -1,12 +1,11 @@
-name: Backend CI
+name: Backend CI/CD
 
 on:
   push:
     branches: [ main ]
-  pull_request:
-    branches: [ main ]
 
 jobs:
+
   test:
     runs-on: ubuntu-latest
 
@@ -21,10 +20,11 @@ jobs:
           java-version: '21'
           cache: maven
 
-      - name: Run JUnit tests from separate test folder
+      - name: Run JUnit tests
         run: ./backend/mvnw -B clean test -f ./backend/pom.xml
 
-  build:
+
+  build-and-deploy:
     runs-on: ubuntu-latest
     needs: test
 
@@ -42,45 +42,62 @@ jobs:
       - name: Build backend artifact
         run: ./backend/mvnw -B package -DskipTests -f ./backend/pom.xml
 
-  docker-build:
-    runs-on: ubuntu-latest
-    needs: build
-  
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-  
-      - name: Build backend Docker image
-        run: docker build -t app-image ./backend
 
-      - name: Build frontend Docker image
-        run: docker build -t frontend-image ./react
-  
-      - name: configure aws
+      # ----------------------------
+      # CONFIGURE AWS
+      # ----------------------------
+
+      - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ secrets.AWS_REGION }}
-      
+
       - name: Login to Amazon ECR
         uses: aws-actions/amazon-ecr-login@v2
-  
+
+
+      # ----------------------------
+      # BUILD DOCKER IMAGES
+      # ----------------------------
+
+      - name: Build backend Docker image
+        run: docker build -t backend-image ./backend
+
+      - name: Build frontend Docker image
+        run: docker build -t frontend-image ./react
+
+
+      # ----------------------------
+      # PUSH BACKEND IMAGE
+      # ----------------------------
+
       - name: Tag and push backend image
         run: |
-          IMAGE=${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/${{ vars.ECR_Backend }}:${{ github.sha }}
-          docker tag app-image $IMAGE
-          docker push $IMAGE
+          docker tag backend-image \
+          ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/${{ vars.ECR_Backend }}:${{ github.sha }}
+
+          docker push \
+          ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/${{ vars.ECR_Backend }}:${{ github.sha }}
+
+
+      # ----------------------------
+      # PUSH FRONTEND IMAGE
+      # ----------------------------
 
       - name: Tag and push frontend image
         run: |
-          IMAGE=${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/${{ vars.ECR_Frontend }}:${{ github.sha }}
-          docker tag frontend-image $IMAGE
-          docker push $IMAGE
+          docker tag frontend-image \
+          ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/${{ vars.ECR_Frontend }}:${{ github.sha }}
 
-      # ----------------------------
+          docker push \
+          ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/${{ vars.ECR_Frontend }}:${{ github.sha }}
+
+
+      # =====================================================
       # BACKEND DEPLOY
-      # ----------------------------
+      # =====================================================
 
       - name: Download Backend Task Definition
         run: |
@@ -95,7 +112,7 @@ jobs:
         with:
           task-definition: backend-task.json
           container-name: digital-menu-backend-container
-          image: ${{ env.BACKEND_IMAGE }}
+          image: ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/${{ vars.ECR_Backend }}:${{ github.sha }}
 
       - name: Deploy Backend Service
         uses: aws-actions/amazon-ecs-deploy-task-definition@v1
@@ -105,9 +122,10 @@ jobs:
           cluster: digital-menu-ecs-cluster
           wait-for-service-stability: true
 
-      # ----------------------------
+
+      # =====================================================
       # FRONTEND DEPLOY
-      # ----------------------------
+      # =====================================================
 
       - name: Download Frontend Task Definition
         run: |
@@ -122,7 +140,7 @@ jobs:
         with:
           task-definition: frontend-task.json
           container-name: digital-menu-frontend-container
-          image: ${{ env.FRONTEND_IMAGE }}
+          image: ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/${{ vars.ECR_Frontend }}:${{ github.sha }}
 
       - name: Deploy Frontend Service
         uses: aws-actions/amazon-ecs-deploy-task-definition@v1
@@ -131,4 +149,3 @@ jobs:
           service: digital-menu-frontend-service-h680ldkz
           cluster: digital-menu-ecs-cluster
           wait-for-service-stability: true
-  
