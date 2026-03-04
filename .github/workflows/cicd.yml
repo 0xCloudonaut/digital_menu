@@ -77,4 +77,58 @@ jobs:
           IMAGE=${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/${{ vars.ECR_Frontend }}:${{ github.sha }}
           docker tag frontend-image $IMAGE
           docker push $IMAGE
+
+      # ----------------------------
+      # BACKEND DEPLOY
+      # ----------------------------
+
+      - name: Download Backend Task Definition
+        run: |
+          aws ecs describe-task-definition \
+            --task-definition digital-menu-backend \
+            --query taskDefinition \
+            > backend-task.json
+
+      - name: Render Backend Task Definition
+        id: backend-task
+        uses: aws-actions/amazon-ecs-render-task-definition@v1
+        with:
+          task-definition: backend-task.json
+          container-name: digital-menu-backend-container
+          image: ${{ env.BACKEND_IMAGE }}
+
+      - name: Deploy Backend Service
+        uses: aws-actions/amazon-ecs-deploy-task-definition@v1
+        with:
+          task-definition: ${{ steps.backend-task.outputs.task-definition }}
+          service: digital-menu-backend-service-83lxn7di
+          cluster: digital-menu-ecs-cluster
+          wait-for-service-stability: true
+
+      # ----------------------------
+      # FRONTEND DEPLOY
+      # ----------------------------
+
+      - name: Download Frontend Task Definition
+        run: |
+          aws ecs describe-task-definition \
+            --task-definition digital-menu-frontend \
+            --query taskDefinition \
+            > frontend-task.json
+
+      - name: Render Frontend Task Definition
+        id: frontend-task
+        uses: aws-actions/amazon-ecs-render-task-definition@v1
+        with:
+          task-definition: frontend-task.json
+          container-name: digital-menu-frontend-container
+          image: ${{ env.FRONTEND_IMAGE }}
+
+      - name: Deploy Frontend Service
+        uses: aws-actions/amazon-ecs-deploy-task-definition@v1
+        with:
+          task-definition: ${{ steps.frontend-task.outputs.task-definition }}
+          service: digital-menu-frontend-service-h680ldkz
+          cluster: digital-menu-ecs-cluster
+          wait-for-service-stability: true
   
