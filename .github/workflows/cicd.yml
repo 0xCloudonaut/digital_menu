@@ -131,7 +131,7 @@ jobs:
         uses: aws-actions/amazon-ecs-deploy-task-definition@v1
         with:
           task-definition: ${{ steps.backend-task.outputs.task-definition }}
-          service: digital-menu-backend-service-83lxn7di
+          service: digital-menu-backend-service-zaionya6
           cluster: digital-menu-ecs-cluster
           wait-for-service-stability: true
 
